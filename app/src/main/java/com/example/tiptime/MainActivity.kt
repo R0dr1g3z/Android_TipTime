@@ -3,16 +3,20 @@ package com.example.tiptime
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.Surface
-import androidx.compose.material.Text
-import androidx.compose.material.TextField
+import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -41,8 +45,13 @@ fun TipTimeApp() {
 @Composable
 fun TipTimeScreen() {
     var amountInput by remember { mutableStateOf("") }
+    var tipInput by remember { mutableStateOf("") }
+    var roundUp by remember { mutableStateOf(false) }
+    var addTip by remember { mutableStateOf(false) }
     val amount = amountInput.toDoubleOrNull() ?: 0.0
-    val tip = calculateTip(amount)
+    val tipPercent = tipInput.toDoubleOrNull() ?: 0.0
+    val tip = calculateTip(amount, tipPercent, roundUp, addTip)
+    val focusManager = LocalFocusManager.current
 
     Column(
         modifier = Modifier
@@ -56,8 +65,36 @@ fun TipTimeScreen() {
         )
         Spacer(modifier = Modifier.height(16.dp))
         EditNumberField(
+            label = R.string.bill_amount,
             value = amountInput,
-            onValueChange = { amountInput = it })
+            onValueChange = { amountInput = it },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { focusManager.moveFocus(FocusDirection.Down) })
+        )
+        EditNumberField(
+            label = R.string.how_was_the_service,
+            value = tipInput,
+            onValueChange = { tipInput = it },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() })
+        )
+        RoundTheTipRow(
+            roundUp = addTip,
+            onRoundUpChanged = { addTip = it },
+            text = R.string.add_tip
+        )
+        RoundTheTipRow(
+            roundUp = roundUp,
+            onRoundUpChanged = { roundUp = it },
+            text = R.string.round_up_tip
+        )
         Spacer(modifier = Modifier.height(24.dp))
         Text(
             text = stringResource(R.string.tip_amount, tip),
@@ -70,25 +107,57 @@ fun TipTimeScreen() {
 
 @Composable
 fun EditNumberField(
+    @StringRes label: Int,
+    keyboardOptions: KeyboardOptions,
+    keyboardActions: KeyboardActions,
     value: String,
     onValueChange: (String) -> Unit
 ) {
     TextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text(stringResource(R.string.cost_of_service)) },
+        label = { Text(stringResource(label)) },
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+        keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions
     )
+}
+
+@Composable
+fun RoundTheTipRow(
+    @StringRes text: Int,
+    roundUp: Boolean,
+    onRoundUpChanged: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .size(48.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(stringResource(text))
+        Switch(
+            checked = roundUp,
+            onCheckedChange = onRoundUpChanged,
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentWidth(Alignment.End),
+            colors = SwitchDefaults.colors(uncheckedThumbColor = Color.DarkGray)
+        )
+    }
 }
 
 @Composable
 private fun calculateTip(
     amount: Double,
-    tipPercent: Double = 15.0
+    tipPercent: Double,
+    roundUp: Boolean,
+    addTip: Boolean
 ): String {
-    val tip = tipPercent / 100 * amount
+    var tip = 0.0
+    if (addTip) tip = tipPercent / 100 * amount
+    if (roundUp) tip = kotlin.math.ceil(tip)
     return NumberFormat.getCurrencyInstance().format(tip)
 }
 
